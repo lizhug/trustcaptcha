@@ -20,8 +20,20 @@ base64url_32() {
   openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n\r'
 }
 
-create_secret trustcaptcha_postgres_password "$(openssl rand -hex 32)"
-create_secret trustcaptcha_redis_password "$(openssl rand -hex 32)"
+if ! secret_exists trustcaptcha_database_url; then
+  : "${DATABASE_URL:?Set DATABASE_URL to the external PostgreSQL connection URL}"
+  create_secret trustcaptcha_database_url "$DATABASE_URL"
+else
+  echo "Keeping existing secret: trustcaptcha_database_url"
+fi
+
+if ! secret_exists trustcaptcha_redis_url; then
+  : "${REDIS_URL:?Set REDIS_URL to the external Redis connection URL}"
+  create_secret trustcaptcha_redis_url "$REDIS_URL"
+else
+  echo "Keeping existing secret: trustcaptcha_redis_url"
+fi
+
 create_secret trustcaptcha_auth_secret "$(openssl rand -hex 32)"
 create_secret trustcaptcha_secret_hash_pepper "$(openssl rand -hex 32)"
 create_secret trustcaptcha_ip_hash_pepper "$(openssl rand -hex 32)"

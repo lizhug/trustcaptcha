@@ -7,15 +7,15 @@ This deployment uses stack name `trustcaptcha` and three HTTPS origins:
 - `https://api.trustcaptcha.xuandev.com` — public verification API
 
 The application services publish no host ports. Caddy reaches them through a
-shared encrypted overlay network. PostgreSQL and Redis use local named volumes
-and are pinned to one labeled data node.
+shared encrypted overlay network. PostgreSQL and Redis are external managed
+services and are not created by this stack.
 
 ## 1. DNS and prerequisites
 
 Create `A`/`AAAA` records for the base, `app`, and `api` hostnames pointing to
 the node where Caddy publishes ports 80 and 443. The Swarm must already be
-initialized, and the deployment machine needs Docker, OpenSSL, and registry
-credentials.
+initialized, and the deployment machine needs Docker, OpenSSL, registry
+credentials, and network access to the external PostgreSQL and Redis endpoints.
 
 Create or reuse an attachable overlay network for Caddy:
 
@@ -48,29 +48,31 @@ set +a
 `docker stack deploy` does not support Compose's `--env-file`, so export these
 variables in the shell before every deploy.
 
-## 3. Build and push immutable images
+## 3. Publish immutable images with CI
 
-Run from the repository root:
+Push a `staging-*` or `v*` Git tag. Gitea Actions builds and publishes the four
+images; production images also receive the `prod` channel tag. Do not build
+images on the Swarm server.
 
 ```sh
-sh deploy/swarm/build-and-push.sh
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 Swarm nodes must be able to pull `${IMAGE_PREFIX}`. Do not deploy mutable tags
 for production releases.
 
-## 4. Pin state and create secrets
+## 4. Configure external data services and secrets
 
-Choose the node that will hold the PostgreSQL and Redis volumes:
-
-```sh
-docker node update --label-add trustcaptcha.data=true YOUR_DATA_NODE
-```
-
-Create all required Swarm secrets. Existing secrets are preserved:
+Provide complete connection URLs when creating the secrets for the first time.
+Use `postgresql://` for PostgreSQL and `redis://` or `rediss://` for Redis. Add
+provider-required TLS/query parameters to the URLs.
 
 ```sh
-SEED_ADMIN_PASSWORD='replace-with-a-long-password' sh deploy/swarm/init-secrets.sh
+DATABASE_URL='postgresql://USER:PASSWORD@DB_HOST:5432/trustcaptcha?sslmode=require' \
+REDIS_URL='rediss://default:PASSWORD@REDIS_HOST:6379/0' \
+SEED_ADMIN_PASSWORD='replace-with-a-long-password' \
+sh deploy/swarm/init-secrets.sh
 ```
 
 If `SEED_ADMIN_PASSWORD` is omitted, the script generates and prints it once.
@@ -89,9 +91,10 @@ docker stack services trustcaptcha
 docker service ps trustcaptcha_migrate --no-trunc
 ```
 
-The migration task waits for PostgreSQL, applies Prisma migrations, and runs the
-idempotent seed once. On a new immutable image tag, Swarm creates a new migration
-task. Do not direct production traffic to a release whose migration task failed.
+The migration task waits for the external PostgreSQL endpoint, applies Prisma
+migrations, and runs the idempotent seed once. On a new immutable image tag,
+Swarm creates a new migration task. Do not direct production traffic to a
+release whose migration task failed.
 
 The initial login is the configured `SEED_ADMIN_EMAIL` and the password stored in
 the `trustcaptcha_seed_admin_password` secret.
@@ -129,9 +132,10 @@ service logs after its first scheduled run.
 
 ## Operational notes
 
-- The bundled PostgreSQL/Redis layout is suitable for a single data node. For
-  multi-node high availability, replace them with managed or replicated stores.
-- Back up the `trustcaptcha_postgres-data` volume and test restores regularly.
+- Enable automated backups and point-in-time recovery on the external
+  PostgreSQL service, and test restores regularly.
+- Configure Redis persistence/high availability according to the provider's
+  service tier. The verification path fails closed if Redis is unavailable.
 - To rotate an in-use Swarm secret, create a versioned secret, update its name in
   `stack.yml`, deploy, then remove the old secret after all tasks have converged.
 - Keep `CREEM_TEST_MODE=true` until sandbox checkout and webhook flows pass.

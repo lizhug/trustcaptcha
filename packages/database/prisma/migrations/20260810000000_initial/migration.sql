@@ -1,6 +1,6 @@
 -- TrustCaptcha v1 initial schema
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
+-- The PostgreSQL provider provisions the public schema. Application roles only
+-- need CREATE privileges on that schema, not database-level CREATE privileges.
 
 -- CreateEnum
 CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'DELETED');
