@@ -1,0 +1,33 @@
+{
+  "name": "@trustcaptcha/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev --port 4301",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ant-design/charts": "catalog:",
+    "@ant-design/icons": "catalog:",
+    "@ant-design/nextjs-registry": "catalog:",
+    "@ant-design/pro-components": "catalog:",
+    "@auth/prisma-adapter": "catalog:",
+    "@creem_io/nextjs": "0.5.3",
+    "@node-rs/argon2": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@trustcaptcha/database": "workspace:*",
+    "@trustcaptcha/shared": "workspace:*",
+    "antd": "catalog:",
+    "creem": "1.6.0",
+    "next": "catalog:",
+    "next-auth": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "swr": "catalog:",
+    "zod": "catalog:"
+  }
+}

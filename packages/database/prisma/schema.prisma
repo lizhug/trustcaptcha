@@ -1,0 +1,495 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  runtime         = "nodejs"
+  moduleFormat    = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum MemberRole {
+  ADMIN
+  DEVELOPER
+}
+
+enum MemberStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SiteStatus {
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum ApiKeyScope {
+  VERIFY
+  READ_LOGS
+  MANAGE_SITES
+}
+
+enum VerificationStatus {
+  SUCCESS
+  FAILED
+  EXPIRED
+  REPLAYED
+  RATE_LIMITED
+  INVALID
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  SCALE
+  PRIVATE
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELED
+  EXPIRED
+}
+
+enum VerificationPolicyPreset {
+  CONVERSION
+  BALANCED
+  STRICT
+  CUSTOM
+}
+
+enum VerificationPolicyMode {
+  MANAGED
+  INVISIBLE
+  CHECKBOX
+  NON_INTERACTIVE
+}
+
+enum PolicyFailMode {
+  CLOSED
+  OPEN
+}
+
+enum BrandAssetStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AuditActorType {
+  USER
+  API_KEY
+  SYSTEM
+}
+
+enum AuditAction {
+  AUTH_LOGIN_SUCCEEDED
+  AUTH_LOGIN_FAILED
+  AUTH_LOGOUT
+  SITE_CREATED
+  SITE_UPDATED
+  SITE_DISABLED
+  SITE_DELETED
+  SITE_SECRET_VIEWED
+  SITE_SECRET_ROTATED
+  API_KEY_CREATED
+  API_KEY_ROTATED
+  API_KEY_REVOKED
+  MEMBER_ROLE_CHANGED
+  MEMBER_SUSPENDED
+  EXPORT_CREATED
+  SECURITY_RATE_LIMITED
+  SECURITY_CROSS_TENANT_DENIED
+  POLICY_CREATED
+  POLICY_UPDATED
+  POLICY_DELETED
+  BRAND_ASSET_UPLOADED
+  BRAND_ASSET_DELETED
+  BILLING_SUBSCRIPTION_UPDATED
+}
+
+/// Auth.js user plus TrustCaptcha account state.
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  name           String?    @db.VarChar(120)
+  email          String?    @unique(map: "users_email_key") @db.VarChar(320)
+  emailVerified  DateTime?  @db.Timestamptz(3)
+  image          String?    @db.Text
+  passwordHash   String?    @db.VarChar(255)
+  sessionVersion Int        @default(0)
+  status         UserStatus @default(ACTIVE)
+  lastLoginAt    DateTime?  @db.Timestamptz(3)
+  createdAt      DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime   @updatedAt @db.Timestamptz(3)
+  deletedAt      DateTime?  @db.Timestamptz(3)
+
+  accounts       Account[]
+  sessions       Session[]
+  authenticators Authenticator[]
+  memberships    CustomerMember[]
+  sitesCreated   Site[]           @relation("SiteCreatedBy")
+  sitesUpdated   Site[]           @relation("SiteUpdatedBy")
+  apiKeysCreated ApiKey[]         @relation("ApiKeyCreatedBy")
+  apiKeysRevoked ApiKey[]         @relation("ApiKeyRevokedBy")
+  auditLogs      AuditLog[]
+
+  @@index([status, createdAt(sort: Desc)], map: "users_status_created_at_idx")
+  @@map("users")
+}
+
+/// Standard Auth.js OAuth account model.
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @db.Uuid
+  type              String  @db.VarChar(32)
+  provider          String  @db.VarChar(64)
+  providerAccountId String  @db.VarChar(255)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String? @db.VarChar(64)
+  scope             String? @db.Text
+  id_token          String? @db.Text
+  session_state     String? @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId], map: "accounts_provider_provider_account_id_key")
+  @@index([userId], map: "accounts_user_id_idx")
+  @@map("accounts")
+}
+
+/// Database-backed Auth.js session. Session tokens are opaque secrets.
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique(map: "sessions_session_token_key") @db.VarChar(255)
+  userId       String   @db.Uuid
+  expires      DateTime @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "sessions_user_id_idx")
+  @@index([expires], map: "sessions_expires_idx")
+  @@map("sessions")
+}
+
+/// Auth.js email/passwordless verification token model.
+model VerificationToken {
+  identifier String   @db.VarChar(320)
+  token      String   @unique(map: "verification_tokens_token_key") @db.VarChar(255)
+  expires    DateTime @db.Timestamptz(3)
+
+  @@unique([identifier, token], map: "verification_tokens_identifier_token_key")
+  @@index([expires], map: "verification_tokens_expires_idx")
+  @@map("verification_tokens")
+}
+
+/// Auth.js WebAuthn model, retained so passkeys can be enabled without a data migration.
+model Authenticator {
+  credentialID         String  @unique(map: "authenticators_credential_id_key") @db.Text
+  userId               String  @db.Uuid
+  providerAccountId    String  @db.VarChar(255)
+  credentialPublicKey  String  @db.Text
+  counter              Int
+  credentialDeviceType String  @db.VarChar(32)
+  credentialBackedUp   Boolean
+  transports           String? @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, credentialID])
+  @@index([userId], map: "authenticators_user_id_idx")
+  @@map("authenticators")
+}
+
+/// The hard tenant and billing boundary.
+model Customer {
+  id        String         @id @default(uuid()) @db.Uuid
+  name      String         @db.VarChar(160)
+  slug      String         @unique(map: "customers_slug_key") @db.VarChar(80)
+  status    CustomerStatus @default(ACTIVE)
+  planTier  PlanTier       @default(FREE)
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime       @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime?      @db.Timestamptz(3)
+
+  members              CustomerMember[]
+  sites                Site[]
+  apiKeys              ApiKey[]
+  verificationLogs     VerificationLog[]
+  auditLogs            AuditLog[]
+  subscription         Subscription?
+  billingEvents        BillingWebhookEvent[]
+  verificationPolicies VerificationPolicy[]
+  brandAssets          BrandAsset[]
+
+  @@index([status, createdAt(sort: Desc)], map: "customers_status_created_at_idx")
+  @@map("customers")
+}
+
+/// A user can belong to multiple tenants, with one role per tenant.
+model CustomerMember {
+  id         String       @id @default(uuid()) @db.Uuid
+  customerId String       @db.Uuid
+  userId     String       @db.Uuid
+  role       MemberRole
+  status     MemberStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime     @updatedAt @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([customerId, userId], map: "customer_members_customer_id_user_id_key")
+  @@index([userId, status], map: "customer_members_user_id_status_idx")
+  @@index([customerId, role, status], map: "customer_members_customer_role_status_idx")
+  @@map("customer_members")
+}
+
+/// Captcha integration site. Public siteKey is not a credential.
+/// secretHash contains Argon2id(secret + server pepper); plaintext is never stored.
+model Site {
+  id               String     @id @default(uuid()) @db.Uuid
+  customerId       String     @db.Uuid
+  name             String     @db.VarChar(120)
+  domain           String     @db.VarChar(253)
+  allowedOrigins   String[]   @default([])
+  siteKey          String     @unique(map: "sites_site_key_key") @db.VarChar(80)
+  secretKeyId      String     @unique(map: "sites_secret_key_id_key") @db.VarChar(48)
+  secretHash       String     @db.VarChar(255)
+  secretPrefix     String     @db.VarChar(24)
+  secretLastFour   String     @db.Char(4)
+  secretCreatedAt  DateTime   @default(now()) @db.Timestamptz(3)
+  status           SiteStatus @default(ACTIVE)
+  riskThreshold    Int        @default(60) @db.SmallInt
+  tokenTtlSeconds  Int        @default(300) @db.SmallInt
+  defaultLocale    String     @default("auto") @db.VarChar(16)
+  supportedLocales String[]   @default(["auto"])
+  createdById      String?    @db.Uuid
+  updatedById      String?    @db.Uuid
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
+  deletedAt        DateTime?  @db.Timestamptz(3)
+
+  customer             Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy            User?                @relation("SiteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy            User?                @relation("SiteUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  apiKeys              ApiKey[]
+  verificationLogs     VerificationLog[]
+  verificationPolicies VerificationPolicy[]
+  brandAssets          BrandAsset[]
+
+  @@unique([customerId, domain], map: "sites_customer_id_domain_active_key", where: raw("\"deletedAt\" IS NULL"))
+  @@index([customerId, status, createdAt(sort: Desc)], map: "sites_customer_status_created_at_idx")
+  @@index([customerId, name], map: "sites_customer_name_idx")
+  @@map("sites")
+}
+
+model VerificationPolicy {
+  id                String                   @id @default(uuid()) @db.Uuid
+  customerId        String                   @db.Uuid
+  siteId            String                   @db.Uuid
+  action            String                   @default("*") @db.VarChar(32)
+  preset            VerificationPolicyPreset @default(BALANCED)
+  mode              VerificationPolicyMode   @default(MANAGED)
+  allowedChallenges String[]                 @default(["POW", "CHECKBOX"])
+  riskThreshold     Int?                     @db.SmallInt
+  maxAttempts       Int                      @default(3) @db.SmallInt
+  immunitySeconds   Int                      @default(300) @db.Integer
+  failMode          PolicyFailMode           @default(CLOSED)
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                 @updatedAt @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  site     Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, action], map: "verification_policies_site_action_key")
+  @@index([customerId, siteId], map: "verification_policies_customer_site_idx")
+  @@map("verification_policies")
+}
+
+model BrandAsset {
+  id         String           @id @default(uuid()) @db.Uuid
+  customerId String           @db.Uuid
+  siteId     String           @db.Uuid
+  name       String           @db.VarChar(120)
+  altText    String           @db.VarChar(180)
+  mimeType   String           @db.VarChar(32)
+  byteSize   Int              @db.Integer
+  sha256     String           @db.Char(64)
+  content    Bytes
+  status     BrandAssetStatus @default(ACTIVE)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  site     Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, sha256], map: "brand_assets_site_sha256_key")
+  @@index([customerId, siteId, status], map: "brand_assets_customer_site_status_idx")
+  @@map("brand_assets")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  customerId             String             @unique(map: "subscriptions_customer_id_key") @db.Uuid
+  provider               String             @default("CREEM") @db.VarChar(16)
+  providerCustomerId     String?            @unique(map: "subscriptions_provider_customer_id_key") @db.VarChar(80)
+  providerSubscriptionId String?            @unique(map: "subscriptions_provider_subscription_id_key") @db.VarChar(80)
+  providerProductId      String?            @db.VarChar(80)
+  planTier               PlanTier           @default(FREE)
+  status                 SubscriptionStatus @default(NONE)
+  currentPeriodStart     DateTime?          @db.Timestamptz(3)
+  currentPeriodEnd       DateTime?          @db.Timestamptz(3)
+  cancelAtPeriodEnd      Boolean            @default(false)
+  createdAt              DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime           @updatedAt @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([status, currentPeriodEnd], map: "subscriptions_status_period_end_idx")
+  @@map("subscriptions")
+}
+
+model BillingWebhookEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  customerId      String?  @db.Uuid
+  provider        String   @default("CREEM") @db.VarChar(16)
+  providerEventId String   @unique(map: "billing_webhook_events_provider_event_id_key") @db.VarChar(96)
+  eventType       String   @db.VarChar(64)
+  payloadHash     String   @db.Char(64)
+  processedAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, processedAt(sort: Desc)], map: "billing_webhook_events_customer_processed_idx")
+  @@map("billing_webhook_events")
+}
+
+/// Server-side credential. keyId locates the row; only the Argon2id hash is persisted.
+model ApiKey {
+  id            String        @id @default(uuid()) @db.Uuid
+  customerId    String        @db.Uuid
+  siteId        String?       @db.Uuid
+  name          String        @db.VarChar(120)
+  keyId         String        @unique(map: "api_keys_key_id_key") @db.VarChar(48)
+  secretHash    String        @db.VarChar(255)
+  prefix        String        @db.VarChar(24)
+  lastFour      String        @db.Char(4)
+  scopes        ApiKeyScope[]
+  status        ApiKeyStatus  @default(ACTIVE)
+  createdById   String?       @db.Uuid
+  revokedById   String?       @db.Uuid
+  rotatedFromId String?       @unique(map: "api_keys_rotated_from_id_key") @db.Uuid
+  lastUsedAt    DateTime?     @db.Timestamptz(3)
+  expiresAt     DateTime?     @db.Timestamptz(3)
+  revokedAt     DateTime?     @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
+
+  customer         Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  site             Site?             @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  createdBy        User?             @relation("ApiKeyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  revokedBy        User?             @relation("ApiKeyRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  rotatedFrom      ApiKey?           @relation("ApiKeyRotation", fields: [rotatedFromId], references: [id], onDelete: SetNull)
+  rotatedTo        ApiKey?           @relation("ApiKeyRotation")
+  verificationLogs VerificationLog[]
+
+  @@index([customerId, status, createdAt(sort: Desc)], map: "api_keys_customer_status_created_at_idx")
+  @@index([customerId, siteId, status], map: "api_keys_customer_site_status_idx")
+  @@index([expiresAt], map: "api_keys_expires_at_idx")
+  @@map("api_keys")
+}
+
+/// Durable product fact for dashboard metrics and investigation.
+/// IP is encrypted for authorized display and separately HMACed for rate analysis.
+model VerificationLog {
+  id                     String             @id @default(uuid()) @db.Uuid
+  action                 String             @default("generic") @db.VarChar(32)
+  customerId             String             @db.Uuid
+  siteId                 String             @db.Uuid
+  apiKeyId               String?            @db.Uuid
+  requestId              String             @db.VarChar(64)
+  challengeId            String?            @db.VarChar(64)
+  tokenFingerprint       String?            @db.VarChar(32)
+  ipAddressEncrypted     Bytes?
+  ipHash                 String             @db.Char(64)
+  userAgent              String?            @db.VarChar(512)
+  userAgentHash          String?            @db.Char(64)
+  origin                 String?            @db.VarChar(255)
+  score                  Int?               @db.SmallInt
+  riskReasons            String[]           @default([])
+  status                 VerificationStatus
+  failureCode            String?            @db.VarChar(64)
+  verificationDurationMs Int?               @db.Integer
+  apiLatencyMs           Int                @db.Integer
+  createdAt              DateTime           @default(now()) @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  site     Site     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  apiKey   ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt(sort: Desc)], map: "verification_logs_customer_created_at_idx")
+  @@index([customerId, siteId, createdAt(sort: Desc)], map: "verification_logs_customer_site_created_at_idx")
+  @@index([customerId, status, createdAt(sort: Desc)], map: "verification_logs_customer_status_created_at_idx")
+  @@index([customerId, action, createdAt(sort: Desc)], map: "verification_logs_customer_action_created_at_idx")
+  @@index([customerId, score, createdAt(sort: Desc)], map: "verification_logs_customer_score_created_at_idx")
+  @@index([customerId, ipHash, createdAt(sort: Desc)], map: "verification_logs_customer_ip_hash_created_at_idx")
+  @@index([challengeId], map: "verification_logs_challenge_id_idx")
+  @@index([requestId], map: "verification_logs_request_id_idx")
+  @@index([createdAt], type: Brin, map: "verification_logs_created_at_brin_idx")
+  @@map("verification_logs")
+}
+
+/// Append-only security and administrative audit trail.
+model AuditLog {
+  id            String         @id @default(uuid()) @db.Uuid
+  customerId    String         @db.Uuid
+  actorType     AuditActorType
+  actorUserId   String?        @db.Uuid
+  actorApiKeyId String?        @db.Uuid
+  action        AuditAction
+  targetType    String?        @db.VarChar(64)
+  targetId      String?        @db.VarChar(64)
+  requestId     String?        @db.VarChar(64)
+  ipHash        String?        @db.Char(64)
+  userAgentHash String?        @db.Char(64)
+  metadata      Json           @default("{}") @db.JsonB
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  actorUser User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt(sort: Desc)], map: "audit_logs_customer_created_at_idx")
+  @@index([customerId, action, createdAt(sort: Desc)], map: "audit_logs_customer_action_created_at_idx")
+  @@index([actorUserId, createdAt(sort: Desc)], map: "audit_logs_actor_user_created_at_idx")
+  @@index([targetType, targetId, createdAt(sort: Desc)], map: "audit_logs_target_created_at_idx")
+  @@index([createdAt], type: Brin, map: "audit_logs_created_at_brin_idx")
+  @@map("audit_logs")
+}

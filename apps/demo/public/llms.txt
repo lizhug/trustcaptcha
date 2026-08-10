@@ -1,0 +1,31 @@
+# TrustCaptcha
+
+TrustCaptcha is an adaptive human-verification and bot-protection SaaS for websites and web applications.
+
+## Core capabilities
+
+- Verification modes: Managed, Invisible, and Checkbox.
+- Managed mode routes low-risk traffic through an invisible check and steps elevated risk up to interaction.
+- Privacy-aware behavior scoring uses bounded aggregates and never uploads raw pointer coordinates or full mouse trails.
+- Every signed verification token is bound to a Site, protected action, challenge nonce, and short expiry.
+- Tokens are atomically consumed once; replayed tokens are rejected.
+- High-risk automated clients may receive a SHA-256 proof-of-work challenge.
+- Integration uses a framework-free JavaScript SDK in the browser and a server-side verification API with a Secret Key.
+
+## Common protected actions
+
+Account login, registration, password reset, checkout, contact forms, comments, and reviews.
+
+## Canonical terminology
+
+- Site Key: public identifier used by the browser SDK.
+- Secret Key: server-only credential used to verify tokens.
+- Action: stable non-user-specific identifier such as account/login or checkout.
+- Risk score: integer from 0 to 100, where higher values indicate greater confidence.
+
+## Homepage sections
+
+- Product modes: /#product
+- Security architecture: /#security
+- Developer integration: /#developers
+- Frequently asked questions: /#faq

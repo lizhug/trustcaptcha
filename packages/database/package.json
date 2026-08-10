@@ -1,0 +1,32 @@
+{
+  "name": "@trustcaptcha/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./enums": "./src/generated/prisma/enums.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "db:format": "prisma format",
+    "db:generate": "prisma generate",
+    "db:seed": "prisma db seed",
+    "db:validate": "prisma validate",
+    "lint": "eslint src --ignore-pattern generated",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@node-rs/argon2": "catalog:",
+    "dotenv": "catalog:",
+    "prisma": "catalog:",
+    "tsx": "catalog:"
+  }
+}

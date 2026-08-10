@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js / Turborepo
+.next/
+out/
+.turbo/
+
+# generated / coverage
+dist/
+coverage/
+packages/database/src/generated/
+apps/api/public/trustcaptcha.js
+apps/api/public/trustcaptcha.js.map
+apps/api/public/v1/
+apps/demo/public/trustcaptcha.js
+apps/demo/public/trustcaptcha.js.map
+apps/demo/public/v1/
+
+# local environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+deploy/swarm/swarm.env
+
+# logs and OS/editor files
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# local database artifacts
+*.db
+*.db-journal

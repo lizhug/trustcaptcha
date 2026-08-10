@@ -1,0 +1,38 @@
+(trustcaptcha_security) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		-Server
+	}
+}
+
+trustcaptcha.xuandev.com {
+	import trustcaptcha_security
+	reverse_proxy trustcaptcha_demo:3000
+	log {
+		output stdout
+		format json
+	}
+}
+
+app.trustcaptcha.xuandev.com {
+	import trustcaptcha_security
+	reverse_proxy trustcaptcha_dashboard:3000
+	log {
+		output stdout
+		format json
+	}
+}
+
+api.trustcaptcha.xuandev.com {
+	import trustcaptcha_security
+	reverse_proxy trustcaptcha_api:3000
+	log {
+		output stdout
+		format json
+	}
+}

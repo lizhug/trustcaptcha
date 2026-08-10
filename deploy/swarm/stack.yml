@@ -1,0 +1,330 @@
+x-app-environment: &app-environment
+  NODE_ENV: production
+  POSTGRES_DB: trustcaptcha
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: trustcaptcha
+  POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+  SECRET_HASH_PEPPER_FILE: /run/secrets/secret_hash_pepper
+
+x-stateless-deploy: &stateless-deploy
+  restart_policy:
+    condition: on-failure
+    delay: 5s
+    max_attempts: 5
+    window: 60s
+  update_config:
+    order: start-first
+    parallelism: 1
+    delay: 10s
+    failure_action: rollback
+    monitor: 30s
+  rollback_config:
+    order: stop-first
+    parallelism: 1
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: trustcaptcha
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_USER: trustcaptcha
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustcaptcha -d trustcaptcha"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 60s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.trustcaptcha.data == true
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
+      update_config:
+        order: stop-first
+
+  redis:
+    image: redis:7.4-alpine
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        password="$$(cat /run/secrets/redis_password)"
+        umask 077
+        printf 'user default on >%s ~* +@all\n' "$$password" > /tmp/users.acl
+        exec redis-server --appendonly yes --appendfsync everysec --aclfile /tmp/users.acl
+    secrets:
+      - redis_password
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'redis-cli --no-auth-warning -a "$$(cat /run/secrets/redis_password)" ping | grep -q PONG',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    stop_grace_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.trustcaptcha.data == true
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+      update_config:
+        order: stop-first
+
+  migrate:
+    image: ${IMAGE_PREFIX}/migrate:${IMAGE_TAG:-latest}
+    command:
+      - sh
+      - -ec
+      - |
+        until node -e "const net=require('node:net');const s=net.connect(5432,'postgres',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),2000)"; do sleep 2; done
+        pnpm --dir packages/database exec prisma migrate deploy
+        pnpm --dir packages/database db:seed
+    environment:
+      <<: *app-environment
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@xuandev.com}
+      SEED_ADMIN_PASSWORD_FILE: /run/secrets/seed_admin_password
+      SEED_CUSTOMER_NAME: ${SEED_CUSTOMER_NAME:-TrustCaptcha}
+      SEED_CUSTOMER_SLUG: ${SEED_CUSTOMER_SLUG:-trustcaptcha}
+      SEED_DEMO_ORIGIN: https://trustcaptcha.xuandev.com
+      SEED_SIGNUP_ORIGIN: https://app.trustcaptcha.xuandev.com
+      SEED_DEMO_SITE_KEY: ${DEMO_SITE_KEY}
+      SEED_DEMO_SITE_SECRET_FILE: /run/secrets/demo_site_secret
+    secrets:
+      - postgres_password
+      - secret_hash_pepper
+      - seed_admin_password
+      - demo_site_secret
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.trustcaptcha.data == true
+      restart_policy:
+        condition: none
+
+  dashboard:
+    image: ${IMAGE_PREFIX}/dashboard:${IMAGE_TAG:-latest}
+    environment:
+      <<: *app-environment
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: https://app.trustcaptcha.xuandev.com
+      DASHBOARD_ORIGIN: https://app.trustcaptcha.xuandev.com
+      NEXT_PUBLIC_DASHBOARD_URL: https://app.trustcaptcha.xuandev.com
+      NEXT_PUBLIC_API_URL: https://api.trustcaptcha.xuandev.com
+      NEXT_PUBLIC_SIGNUP_SITE_KEY: ${DEMO_SITE_KEY}
+      CREEM_API_KEY_FILE: /run/secrets/creem_api_key
+      CREEM_WEBHOOK_SECRET_FILE: /run/secrets/creem_webhook_secret
+      CREEM_TEST_MODE: ${CREEM_TEST_MODE:-true}
+      CREEM_PRO_MONTHLY_PRODUCT_ID: ${CREEM_PRO_MONTHLY_PRODUCT_ID:-}
+      CREEM_PRO_YEARLY_PRODUCT_ID: ${CREEM_PRO_YEARLY_PRODUCT_ID:-}
+      CREEM_SCALE_MONTHLY_PRODUCT_ID: ${CREEM_SCALE_MONTHLY_PRODUCT_ID:-}
+      CREEM_SCALE_YEARLY_PRODUCT_ID: ${CREEM_SCALE_YEARLY_PRODUCT_ID:-}
+      CREEM_PRIVATE_MONTHLY_PRODUCT_ID: ${CREEM_PRIVATE_MONTHLY_PRODUCT_ID:-}
+      CREEM_PRIVATE_YEARLY_PRODUCT_ID: ${CREEM_PRIVATE_YEARLY_PRODUCT_ID:-}
+      IP_ENCRYPTION_KEY_FILE: /run/secrets/ip_encryption_key
+      TRUSTCAPTCHA_API_URL: http://api:3000
+      TRUSTCAPTCHA_SIGNUP_SECRET_FILE: /run/secrets/demo_site_secret
+    secrets:
+      - postgres_password
+      - secret_hash_pepper
+      - auth_secret
+      - creem_api_key
+      - creem_webhook_secret
+      - ip_encryption_key
+      - demo_site_secret
+    networks:
+      - backend
+      - caddy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+    deploy:
+      <<: *stateless-deploy
+      replicas: 1
+
+  api:
+    image: ${IMAGE_PREFIX}/api:${IMAGE_TAG:-latest}
+    environment:
+      <<: *app-environment
+      ACTIVE_TOKEN_SIGNING_KEY_ID: ${ACTIVE_TOKEN_SIGNING_KEY_ID:-prod-k1}
+      IP_ENCRYPTION_KEY_FILE: /run/secrets/ip_encryption_key
+      IP_HASH_PEPPER_FILE: /run/secrets/ip_hash_pepper
+      REDIS_DB: "0"
+      REDIS_HOST: redis
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      REDIS_PORT: "6379"
+      REQUEST_BINDING_PEPPER_FILE: /run/secrets/request_binding_pepper
+      RETENTION_CRON_SECRET_FILE: /run/secrets/retention_cron_secret
+      TOKEN_SIGNING_KEYS_FILE: /run/secrets/token_signing_keys
+      TRUST_PROXY: "true"
+    secrets:
+      - postgres_password
+      - secret_hash_pepper
+      - redis_password
+      - ip_encryption_key
+      - ip_hash_pepper
+      - request_binding_pepper
+      - retention_cron_secret
+      - token_signing_keys
+    networks:
+      - backend
+      - caddy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    stop_grace_period: 30s
+    deploy:
+      <<: *stateless-deploy
+      replicas: 2
+
+  demo:
+    image: ${IMAGE_PREFIX}/demo:${IMAGE_TAG:-latest}
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.trustcaptcha.xuandev.com
+      NEXT_PUBLIC_DASHBOARD_URL: https://app.trustcaptcha.xuandev.com
+      NEXT_PUBLIC_DEMO_SITE_KEY: ${DEMO_SITE_KEY}
+      NEXT_PUBLIC_SITE_URL: https://trustcaptcha.xuandev.com
+      TRUSTCAPTCHA_API_URL: http://api:3000
+      TRUSTCAPTCHA_DEMO_SECRET_FILE: /run/secrets/demo_site_secret
+    secrets:
+      - demo_site_secret
+    networks:
+      - backend
+      - caddy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/zh-CN').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+    deploy:
+      <<: *stateless-deploy
+      replicas: 2
+
+  retention:
+    image: alpine:3.22
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        sleep 900
+        while true; do
+          wget -qO- --header="Authorization: Bearer $$(cat /run/secrets/retention_cron_secret)" --post-data='' http://api:3000/api/internal/retention || true
+          sleep 86400
+        done
+    secrets:
+      - retention_cron_secret
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 10s
+
+networks:
+  backend:
+    driver: overlay
+    driver_opts:
+      encrypted: ""
+  caddy:
+    external: true
+    name: ${CADDY_NETWORK:-caddy}
+
+volumes:
+  postgres-data:
+  redis-data:
+
+secrets:
+  postgres_password:
+    external: true
+    name: trustcaptcha_postgres_password
+  redis_password:
+    external: true
+    name: trustcaptcha_redis_password
+  auth_secret:
+    external: true
+    name: trustcaptcha_auth_secret
+  secret_hash_pepper:
+    external: true
+    name: trustcaptcha_secret_hash_pepper
+  ip_hash_pepper:
+    external: true
+    name: trustcaptcha_ip_hash_pepper
+  request_binding_pepper:
+    external: true
+    name: trustcaptcha_request_binding_pepper
+  ip_encryption_key:
+    external: true
+    name: trustcaptcha_ip_encryption_key
+  token_signing_keys:
+    external: true
+    name: trustcaptcha_token_signing_keys
+  retention_cron_secret:
+    external: true
+    name: trustcaptcha_retention_cron_secret
+  seed_admin_password:
+    external: true
+    name: trustcaptcha_seed_admin_password
+  demo_site_secret:
+    external: true
+    name: trustcaptcha_demo_site_secret
+  creem_api_key:
+    external: true
+    name: trustcaptcha_creem_api_key
+  creem_webhook_secret:
+    external: true
+    name: trustcaptcha_creem_webhook_secret

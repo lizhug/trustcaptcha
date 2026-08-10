@@ -1,0 +1,27 @@
+{
+  "name": "@trustcaptcha/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev --port 4302",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "catalog:",
+    "@trustcaptcha/captcha-core": "workspace:*",
+    "@trustcaptcha/database": "workspace:*",
+    "@trustcaptcha/risk-engine": "workspace:*",
+    "@trustcaptcha/sdk": "workspace:*",
+    "@trustcaptcha/shared": "workspace:*",
+    "@trustcaptcha/token": "workspace:*",
+    "ioredis": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  }
+}

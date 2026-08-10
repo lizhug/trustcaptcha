@@ -1,0 +1,180 @@
+name: Build and Deploy TrustCaptcha
+
+on:
+  push:
+    tags:
+      - "staging-*"
+      - "v*"
+
+env:
+  REGISTRY: ci-internal.routemarket.ai
+  IMAGE_PREFIX: ci-internal.routemarket.ai/pxtech/trustcaptcha
+
+concurrency:
+  group: trustcaptcha-publish-${{ gitea.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Check formatting
+        run: corepack pnpm format:check
+
+      - name: Type-check
+        run: corepack pnpm typecheck
+
+      - name: Run unit tests
+        run: corepack pnpm test
+
+      - name: Lint
+        run: corepack pnpm lint
+
+      - name: Build applications and packages
+        run: corepack pnpm build
+
+  build:
+    name: Build ${{ matrix.image }} image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            target: runner
+            app_name: api
+          - image: dashboard
+            target: runner
+            app_name: dashboard
+          - image: demo
+            target: runner
+            app_name: demo
+          - image: migrate
+            target: migrator
+            app_name: api
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve release tags
+        id: release
+        shell: bash
+        env:
+          REF_NAME: ${{ gitea.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$REF_NAME" in
+            staging-*) channel="staging" ;;
+            v*) channel="prod" ;;
+            *) echo "Unsupported tag: $REF_NAME" >&2; exit 1 ;;
+          esac
+          echo "release_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "channel_tag=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Validate public build configuration
+        if: ${{ matrix.target == 'runner' }}
+        shell: bash
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_DASHBOARD_URL: ${{ vars.NEXT_PUBLIC_DASHBOARD_URL }}
+          NEXT_PUBLIC_DEMO_SITE_KEY: ${{ vars.NEXT_PUBLIC_DEMO_SITE_KEY }}
+          NEXT_PUBLIC_SIGNUP_SITE_KEY: ${{ vars.NEXT_PUBLIC_SIGNUP_SITE_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            NEXT_PUBLIC_API_URL \
+            NEXT_PUBLIC_DASHBOARD_URL \
+            NEXT_PUBLIC_DEMO_SITE_KEY \
+            NEXT_PUBLIC_SIGNUP_SITE_KEY \
+            NEXT_PUBLIC_SITE_URL
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing Gitea repository variable: $name" >&2
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to the container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          pull: true
+          push: true
+          build-args: |
+            APP_NAME=${{ matrix.app_name }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_DASHBOARD_URL=${{ vars.NEXT_PUBLIC_DASHBOARD_URL }}
+            NEXT_PUBLIC_DEMO_SITE_KEY=${{ vars.NEXT_PUBLIC_DEMO_SITE_KEY }}
+            NEXT_PUBLIC_SIGNUP_SITE_KEY=${{ vars.NEXT_PUBLIC_SIGNUP_SITE_KEY }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.release.outputs.release_tag }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.release.outputs.channel_tag }}
+          cache-from: type=gha,scope=trustcaptcha-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=trustcaptcha-${{ matrix.image }}
+
+      - name: Remove Buildx builder
+        if: always()
+        shell: bash
+        run: docker buildx rm --force "${{ steps.buildx.outputs.name }}" || true
+
+  deploy-production:
+    name: Trigger production deployment
+    needs: build
+    if: ${{ startsWith(gitea.ref_name, 'v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger Portainer webhook
+        shell: bash
+        env:
+          PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PORTAINER_WEBHOOK_URL:-}" ]; then
+            echo "Missing Gitea Actions secret: PORTAINER_WEBHOOK_URL" >&2
+            exit 1
+          fi
+          curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --request POST \
+            "$PORTAINER_WEBHOOK_URL"

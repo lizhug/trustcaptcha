@@ -1,0 +1,19 @@
+{
+  "name": "@trustcaptcha/captcha-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@trustcaptcha/risk-engine": "workspace:*",
+    "@trustcaptcha/shared": "workspace:*"
+  }
+}

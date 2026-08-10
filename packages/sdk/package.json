@@ -1,0 +1,23 @@
+{
+  "name": "@trustcaptcha/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsup && node scripts/copy-assets.mjs",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@trustcaptcha/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "catalog:",
+    "tsup": "catalog:"
+  }
+}

@@ -1,0 +1,195 @@
+name: trustcaptcha
+
+x-database-url: &database-url postgresql://trustcaptcha:trustcaptcha-dev-password@postgres:5432/trustcaptcha
+x-redis-url: &redis-url redis://:trustcaptcha-redis-dev-password@redis:6379/0
+x-secret-pepper: &secret-pepper trustcaptcha-dev-secret-hash-pepper-change-before-production
+x-ip-hash-pepper: &ip-hash-pepper trustcaptcha-dev-ip-hash-pepper-change-before-production
+x-binding-pepper: &binding-pepper trustcaptcha-dev-binding-pepper-change-before-production
+x-token-keys: &token-keys dev-k1:QDZhm7YZxxM6sJYui_B1F-Uy49BpLK0q6SToK7Pa7W8
+x-demo-site-key: &demo-site-key tc_pk_7X3k9mQ2vL8pR4sT6uW1yZ0a
+x-demo-secret: &demo-secret tc_sk_D3m0S1t3K3y2026x_s025mjhX4K3Vp2qv1mLfKMGfLQId-ZgQ74O6t-VIen8
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trustcaptcha
+      POSTGRES_PASSWORD: trustcaptcha-dev-password
+      POSTGRES_USER: trustcaptcha
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustcaptcha -d trustcaptcha"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: trustcaptcha-redis-dev-password
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - trustcaptcha-redis-dev-password
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    build:
+      context: .
+      target: migrator
+    restart: "no"
+    environment:
+      DATABASE_URL: *database-url
+      SECRET_HASH_PEPPER: *secret-pepper
+      SEED_ADMIN_EMAIL: admin@trustcaptcha.local
+      SEED_ADMIN_PASSWORD: TrustCaptcha-Local-Admin-2026!
+      SEED_CUSTOMER_NAME: TrustCaptcha Demo
+      SEED_CUSTOMER_SLUG: trustcaptcha-demo
+      SEED_DEMO_ORIGIN: http://localhost:4303
+      SEED_SIGNUP_ORIGIN: http://localhost:4301
+      SEED_DEMO_SITE_KEY: *demo-site-key
+      SEED_DEMO_SITE_SECRET: *demo-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: .
+      target: runner
+      args:
+        APP_NAME: dashboard
+        NEXT_PUBLIC_API_URL: http://localhost:4302
+        NEXT_PUBLIC_SIGNUP_SITE_KEY: *demo-site-key
+    init: true
+    restart: unless-stopped
+    environment:
+      AUTH_SECRET: trustcaptcha-local-auth-secret-with-more-than-32-bytes
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: http://localhost:4301
+      DASHBOARD_ORIGIN: http://localhost:4301
+      NEXT_PUBLIC_DASHBOARD_URL: http://localhost:4301
+      NEXT_PUBLIC_API_URL: http://localhost:4302
+      NEXT_PUBLIC_SIGNUP_SITE_KEY: *demo-site-key
+      DATABASE_URL: *database-url
+      CREEM_API_KEY: ${CREEM_API_KEY:-}
+      CREEM_WEBHOOK_SECRET: ${CREEM_WEBHOOK_SECRET:-}
+      CREEM_TEST_MODE: ${CREEM_TEST_MODE:-true}
+      CREEM_PRO_MONTHLY_PRODUCT_ID: ${CREEM_PRO_MONTHLY_PRODUCT_ID:-}
+      CREEM_PRO_YEARLY_PRODUCT_ID: ${CREEM_PRO_YEARLY_PRODUCT_ID:-}
+      CREEM_SCALE_MONTHLY_PRODUCT_ID: ${CREEM_SCALE_MONTHLY_PRODUCT_ID:-}
+      CREEM_SCALE_YEARLY_PRODUCT_ID: ${CREEM_SCALE_YEARLY_PRODUCT_ID:-}
+      CREEM_PRIVATE_MONTHLY_PRODUCT_ID: ${CREEM_PRIVATE_MONTHLY_PRODUCT_ID:-}
+      CREEM_PRIVATE_YEARLY_PRODUCT_ID: ${CREEM_PRIVATE_YEARLY_PRODUCT_ID:-}
+      IP_ENCRYPTION_KEY: cs6fo9sL-XrOboakDDKdPPPZ0dWaf1-4AEifqv2-ZPo
+      SECRET_HASH_PEPPER: *secret-pepper
+      TRUSTCAPTCHA_API_URL: http://api:3000
+      TRUSTCAPTCHA_SIGNUP_SECRET: *demo-secret
+    ports:
+      - "4301:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      target: runner
+      args:
+        APP_NAME: api
+    init: true
+    restart: unless-stopped
+    environment:
+      ACTIVE_TOKEN_SIGNING_KEY_ID: dev-k1
+      DATABASE_URL: *database-url
+      IP_ENCRYPTION_KEY: cs6fo9sL-XrOboakDDKdPPPZ0dWaf1-4AEifqv2-ZPo
+      IP_HASH_PEPPER: *ip-hash-pepper
+      REDIS_URL: *redis-url
+      REQUEST_BINDING_PEPPER: *binding-pepper
+      RETENTION_CRON_SECRET: ${RETENTION_CRON_SECRET:-trustcaptcha-local-retention-secret}
+      SECRET_HASH_PEPPER: *secret-pepper
+      TOKEN_SIGNING_KEYS: *token-keys
+      TRUST_PROXY: "false"
+    ports:
+      - "4302:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  demo:
+    build:
+      context: .
+      target: runner
+      args:
+        APP_NAME: demo
+        NEXT_PUBLIC_API_URL: http://localhost:4302
+        NEXT_PUBLIC_DASHBOARD_URL: http://localhost:4301
+        NEXT_PUBLIC_DEMO_SITE_KEY: *demo-site-key
+        NEXT_PUBLIC_SITE_URL: http://localhost:4303
+    init: true
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4302
+      NEXT_PUBLIC_DASHBOARD_URL: http://localhost:4301
+      NEXT_PUBLIC_DEMO_SITE_KEY: *demo-site-key
+      NEXT_PUBLIC_SITE_URL: http://localhost:4303
+      TRUSTCAPTCHA_API_URL: http://api:3000
+      TRUSTCAPTCHA_DEMO_SECRET: *demo-secret
+    ports:
+      - "4303:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  postgres-data:
+  redis-data:
