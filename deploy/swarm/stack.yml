@@ -1,7 +1,7 @@
 x-app-environment: &app-environment
   NODE_ENV: production
-  DATABASE_URL_FILE: /run/secrets/database_url
-  SECRET_HASH_PEPPER_FILE: /run/secrets/secret_hash_pepper
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+  SECRET_HASH_PEPPER: ${SECRET_HASH_PEPPER:?SECRET_HASH_PEPPER is required}
 
 x-stateless-deploy: &stateless-deploy
   restart_policy:
@@ -32,18 +32,13 @@ services:
     environment:
       <<: *app-environment
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@xuandev.com}
-      SEED_ADMIN_PASSWORD_FILE: /run/secrets/seed_admin_password
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required}
       SEED_CUSTOMER_NAME: ${SEED_CUSTOMER_NAME:-TrustCaptcha}
       SEED_CUSTOMER_SLUG: ${SEED_CUSTOMER_SLUG:-trustcaptcha}
       SEED_DEMO_ORIGIN: https://trustcaptcha.xuandev.com
       SEED_SIGNUP_ORIGIN: https://app.trustcaptcha.xuandev.com
-      SEED_DEMO_SITE_KEY: ${DEMO_SITE_KEY}
-      SEED_DEMO_SITE_SECRET_FILE: /run/secrets/demo_site_secret
-    secrets:
-      - database_url
-      - secret_hash_pepper
-      - seed_admin_password
-      - demo_site_secret
+      SEED_DEMO_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
+      SEED_DEMO_SITE_SECRET: ${DEMO_SITE_SECRET:?DEMO_SITE_SECRET is required}
     networks:
       - backend
     deploy:
@@ -55,15 +50,15 @@ services:
     image: ${IMAGE_PREFIX}/dashboard:${IMAGE_TAG:-latest}
     environment:
       <<: *app-environment
-      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: https://app.trustcaptcha.xuandev.com
       DASHBOARD_ORIGIN: https://app.trustcaptcha.xuandev.com
       NEXT_PUBLIC_DASHBOARD_URL: https://app.trustcaptcha.xuandev.com
       NEXT_PUBLIC_API_URL: https://api.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_SIGNUP_SITE_KEY: ${DEMO_SITE_KEY}
-      CREEM_API_KEY_FILE: /run/secrets/creem_api_key
-      CREEM_WEBHOOK_SECRET_FILE: /run/secrets/creem_webhook_secret
+      NEXT_PUBLIC_SIGNUP_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
+      CREEM_API_KEY: ${CREEM_API_KEY:-}
+      CREEM_WEBHOOK_SECRET: ${CREEM_WEBHOOK_SECRET:-}
       CREEM_TEST_MODE: ${CREEM_TEST_MODE:-true}
       CREEM_PRO_MONTHLY_PRODUCT_ID: ${CREEM_PRO_MONTHLY_PRODUCT_ID:-}
       CREEM_PRO_YEARLY_PRODUCT_ID: ${CREEM_PRO_YEARLY_PRODUCT_ID:-}
@@ -71,17 +66,9 @@ services:
       CREEM_SCALE_YEARLY_PRODUCT_ID: ${CREEM_SCALE_YEARLY_PRODUCT_ID:-}
       CREEM_PRIVATE_MONTHLY_PRODUCT_ID: ${CREEM_PRIVATE_MONTHLY_PRODUCT_ID:-}
       CREEM_PRIVATE_YEARLY_PRODUCT_ID: ${CREEM_PRIVATE_YEARLY_PRODUCT_ID:-}
-      IP_ENCRYPTION_KEY_FILE: /run/secrets/ip_encryption_key
+      IP_ENCRYPTION_KEY: ${IP_ENCRYPTION_KEY:?IP_ENCRYPTION_KEY is required}
       TRUSTCAPTCHA_API_URL: http://api:3000
-      TRUSTCAPTCHA_SIGNUP_SECRET_FILE: /run/secrets/demo_site_secret
-    secrets:
-      - database_url
-      - secret_hash_pepper
-      - auth_secret
-      - creem_api_key
-      - creem_webhook_secret
-      - ip_encryption_key
-      - demo_site_secret
+      TRUSTCAPTCHA_SIGNUP_SECRET: ${DEMO_SITE_SECRET:?DEMO_SITE_SECRET is required}
     networks:
       - backend
       - caddy
@@ -107,22 +94,13 @@ services:
     environment:
       <<: *app-environment
       ACTIVE_TOKEN_SIGNING_KEY_ID: ${ACTIVE_TOKEN_SIGNING_KEY_ID:-prod-k1}
-      IP_ENCRYPTION_KEY_FILE: /run/secrets/ip_encryption_key
-      IP_HASH_PEPPER_FILE: /run/secrets/ip_hash_pepper
-      REDIS_URL_FILE: /run/secrets/redis_url
-      REQUEST_BINDING_PEPPER_FILE: /run/secrets/request_binding_pepper
-      RETENTION_CRON_SECRET_FILE: /run/secrets/retention_cron_secret
-      TOKEN_SIGNING_KEYS_FILE: /run/secrets/token_signing_keys
+      IP_ENCRYPTION_KEY: ${IP_ENCRYPTION_KEY:?IP_ENCRYPTION_KEY is required}
+      IP_HASH_PEPPER: ${IP_HASH_PEPPER:?IP_HASH_PEPPER is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      REQUEST_BINDING_PEPPER: ${REQUEST_BINDING_PEPPER:?REQUEST_BINDING_PEPPER is required}
+      RETENTION_CRON_SECRET: ${RETENTION_CRON_SECRET:?RETENTION_CRON_SECRET is required}
+      TOKEN_SIGNING_KEYS: ${TOKEN_SIGNING_KEYS:?TOKEN_SIGNING_KEYS is required}
       TRUST_PROXY: "true"
-    secrets:
-      - database_url
-      - secret_hash_pepper
-      - redis_url
-      - ip_encryption_key
-      - ip_hash_pepper
-      - request_binding_pepper
-      - retention_cron_secret
-      - token_signing_keys
     networks:
       - backend
       - caddy
@@ -148,12 +126,10 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: https://api.trustcaptcha.xuandev.com
       NEXT_PUBLIC_DASHBOARD_URL: https://app.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_DEMO_SITE_KEY: ${DEMO_SITE_KEY}
+      NEXT_PUBLIC_DEMO_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
       NEXT_PUBLIC_SITE_URL: https://trustcaptcha.xuandev.com
       TRUSTCAPTCHA_API_URL: http://api:3000
-      TRUSTCAPTCHA_DEMO_SECRET_FILE: /run/secrets/demo_site_secret
-    secrets:
-      - demo_site_secret
+      TRUSTCAPTCHA_DEMO_SECRET: ${DEMO_SITE_SECRET:?DEMO_SITE_SECRET is required}
     networks:
       - backend
       - caddy
@@ -181,11 +157,11 @@ services:
       - |
         sleep 900
         while true; do
-          wget -qO- --header="Authorization: Bearer $$(cat /run/secrets/retention_cron_secret)" --post-data='' http://api:3000/api/internal/retention || true
+          wget -qO- --header="Authorization: Bearer $${RETENTION_CRON_SECRET}" --post-data='' http://api:3000/api/internal/retention || true
           sleep 86400
         done
-    secrets:
-      - retention_cron_secret
+    environment:
+      RETENTION_CRON_SECRET: ${RETENTION_CRON_SECRET:?RETENTION_CRON_SECRET is required}
     networks:
       - backend
     deploy:
@@ -202,44 +178,3 @@ networks:
   caddy:
     external: true
     name: ${CADDY_NETWORK:-caddy}
-
-secrets:
-  database_url:
-    external: true
-    name: trustcaptcha_database_url
-  redis_url:
-    external: true
-    name: trustcaptcha_redis_url
-  auth_secret:
-    external: true
-    name: trustcaptcha_auth_secret
-  secret_hash_pepper:
-    external: true
-    name: trustcaptcha_secret_hash_pepper
-  ip_hash_pepper:
-    external: true
-    name: trustcaptcha_ip_hash_pepper
-  request_binding_pepper:
-    external: true
-    name: trustcaptcha_request_binding_pepper
-  ip_encryption_key:
-    external: true
-    name: trustcaptcha_ip_encryption_key
-  token_signing_keys:
-    external: true
-    name: trustcaptcha_token_signing_keys
-  retention_cron_secret:
-    external: true
-    name: trustcaptcha_retention_cron_secret
-  seed_admin_password:
-    external: true
-    name: trustcaptcha_seed_admin_password
-  demo_site_secret:
-    external: true
-    name: trustcaptcha_demo_site_secret
-  creem_api_key:
-    external: true
-    name: trustcaptcha_creem_api_key
-  creem_webhook_secret:
-    external: true
-    name: trustcaptcha_creem_webhook_secret

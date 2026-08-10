@@ -16,6 +16,7 @@ Create `A`/`AAAA` records for the base, `app`, and `api` hostnames pointing to
 the node where Caddy publishes ports 80 and 443. The Swarm must already be
 initialized, and the deployment machine needs Docker, OpenSSL, registry
 credentials, and network access to the external PostgreSQL and Redis endpoints.
+All runtime secrets are supplied through the private Stack environment.
 
 Create or reuse an attachable overlay network for Caddy:
 
@@ -62,23 +63,18 @@ git push origin v1.0.0
 Swarm nodes must be able to pull `${IMAGE_PREFIX}`. Do not deploy mutable tags
 for production releases.
 
-## 4. Configure external data services and secrets
+## 4. Configure the private Stack environment
 
-Provide complete connection URLs when creating the secrets for the first time.
-Use `postgresql://` for PostgreSQL and `redis://` or `rediss://` for Redis. Add
-provider-required TLS/query parameters to the URLs.
+Create the Stack environment from `deploy/swarm/swarm.env.example` in Portainer
+and replace every placeholder. Use `postgresql://` for PostgreSQL and
+`redis://` or `rediss://` for Redis. Add provider-required TLS/query parameters
+to the URLs. The stack validates every required value during rendering, so no
+secret initialization script or manual `docker secret create` command is needed.
 
-```sh
-DATABASE_URL='postgresql://USER:PASSWORD@DB_HOST:5432/trustcaptcha?sslmode=require' \
-REDIS_URL='rediss://default:PASSWORD@REDIS_HOST:6379/0' \
-SEED_ADMIN_PASSWORD='replace-with-a-long-password' \
-sh deploy/swarm/init-secrets.sh
-```
-
-If `SEED_ADMIN_PASSWORD` is omitted, the script generates and prints it once.
-Store it immediately; Swarm secrets cannot be read back. Creem starts disabled
-with a sentinel value. Before enabling billing, replace the two Creem secrets
-with real sandbox values and fill the product IDs in `swarm.env`.
+Do not commit the real `.env`. Before enabling billing, add the real Creem
+sandbox values and product IDs. Environment-based secrets are visible to Swarm
+Manager administrators through Docker service inspection; restrict Manager and
+Portainer access accordingly.
 
 ## 5. Deploy the `trustcaptcha` stack
 
@@ -96,8 +92,8 @@ migrations, and runs the idempotent seed once. On a new immutable image tag,
 Swarm creates a new migration task. Do not direct production traffic to a
 release whose migration task failed.
 
-The initial login is the configured `SEED_ADMIN_EMAIL` and the password stored in
-the `trustcaptcha_seed_admin_password` secret.
+The initial login uses the configured `SEED_ADMIN_EMAIL` and
+`SEED_ADMIN_PASSWORD` values.
 
 ## 6. Add the Caddy routes
 
@@ -136,7 +132,7 @@ service logs after its first scheduled run.
   PostgreSQL service, and test restores regularly.
 - Configure Redis persistence/high availability according to the provider's
   service tier. The verification path fails closed if Redis is unavailable.
-- To rotate an in-use Swarm secret, create a versioned secret, update its name in
-  `stack.yml`, deploy, then remove the old secret after all tasks have converged.
+- To rotate a runtime secret, update the private Stack environment and redeploy
+  after coordinating values such as the token key ring across all replicas.
 - Keep `CREEM_TEST_MODE=true` until sandbox checkout and webhook flows pass.
 - The `retention` service calls the protected retention endpoint every 24 hours.
