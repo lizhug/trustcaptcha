@@ -28,17 +28,9 @@ Add these Actions secrets to the repository:
 | `REGISTRY_TOKEN`        | Container-registry password or access token       |
 | `PORTAINER_WEBHOOK_URL` | Production stack webhook; used only for `v*` tags |
 
-Add these Actions variables. They are public values embedded into the Next.js browser bundles at image-build time:
-
-| Variable                      | Production value                       |
-| ----------------------------- | -------------------------------------- |
-| `NEXT_PUBLIC_API_URL`         | `https://api.trustcaptcha.xuandev.com` |
-| `NEXT_PUBLIC_DASHBOARD_URL`   | `https://app.trustcaptcha.xuandev.com` |
-| `NEXT_PUBLIC_DEMO_SITE_KEY`   | The public demo Site Key               |
-| `NEXT_PUBLIC_SIGNUP_SITE_KEY` | The public signup Site Key             |
-| `NEXT_PUBLIC_SITE_URL`        | `https://trustcaptcha.xuandev.com`     |
-
-The workflow fails before the Docker build if a required public variable is empty.
+No public URL or Site Key is required during CI. Images are environment-neutral;
+the private Swarm Stack environment supplies public URLs, Site Keys, data-service
+connections, and security keys when each container starts.
 
 ## Release procedure
 

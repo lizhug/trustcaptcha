@@ -2,9 +2,11 @@ import type { MetadataRoute } from "next";
 
 import { marketingLocales } from "../lib/marketing-i18n";
 
+export const dynamic = "force-dynamic";
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:4303"
+    process.env.PUBLIC_SITE_URL ?? "http://localhost:4303"
   ).replace(/\/$/, "");
   const languages = Object.fromEntries(
     marketingLocales.map((locale) => [locale, `${siteUrl}/${locale}`]),

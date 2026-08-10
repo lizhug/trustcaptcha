@@ -9,8 +9,8 @@ export default async function RegisterPage() {
 
   return (
     <RegisterView
-      apiBaseUrl={process.env.NEXT_PUBLIC_API_URL ?? ""}
-      siteKey={process.env.NEXT_PUBLIC_SIGNUP_SITE_KEY ?? ""}
+      apiBaseUrl={process.env.PUBLIC_API_URL ?? ""}
+      siteKey={process.env.SIGNUP_SITE_KEY ?? ""}
     />
   );
 }

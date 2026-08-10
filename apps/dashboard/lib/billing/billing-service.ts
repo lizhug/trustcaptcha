@@ -98,7 +98,7 @@ export async function createCheckout(
     timeoutMs: 12_000,
   });
   const dashboardUrl = (
-    process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "http://localhost:4301"
+    process.env.PUBLIC_DASHBOARD_URL ?? "http://localhost:4301"
   ).replace(/\/$/, "");
 
   try {

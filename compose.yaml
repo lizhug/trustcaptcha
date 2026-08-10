@@ -70,8 +70,6 @@ services:
       target: runner
       args:
         APP_NAME: dashboard
-        NEXT_PUBLIC_API_URL: http://localhost:4302
-        NEXT_PUBLIC_SIGNUP_SITE_KEY: *demo-site-key
     init: true
     restart: unless-stopped
     environment:
@@ -79,9 +77,10 @@ services:
       AUTH_TRUST_HOST: "true"
       AUTH_URL: http://localhost:4301
       DASHBOARD_ORIGIN: http://localhost:4301
-      NEXT_PUBLIC_DASHBOARD_URL: http://localhost:4301
-      NEXT_PUBLIC_API_URL: http://localhost:4302
-      NEXT_PUBLIC_SIGNUP_SITE_KEY: *demo-site-key
+      PUBLIC_DASHBOARD_URL: http://localhost:4301
+      PUBLIC_API_URL: http://localhost:4302
+      PUBLIC_SITE_URL: http://localhost:4303
+      SIGNUP_SITE_KEY: *demo-site-key
       DATABASE_URL: *database-url
       CREEM_API_KEY: ${CREEM_API_KEY:-}
       CREEM_WEBHOOK_SECRET: ${CREEM_WEBHOOK_SECRET:-}
@@ -159,17 +158,13 @@ services:
       target: runner
       args:
         APP_NAME: demo
-        NEXT_PUBLIC_API_URL: http://localhost:4302
-        NEXT_PUBLIC_DASHBOARD_URL: http://localhost:4301
-        NEXT_PUBLIC_DEMO_SITE_KEY: *demo-site-key
-        NEXT_PUBLIC_SITE_URL: http://localhost:4303
     init: true
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4302
-      NEXT_PUBLIC_DASHBOARD_URL: http://localhost:4301
-      NEXT_PUBLIC_DEMO_SITE_KEY: *demo-site-key
-      NEXT_PUBLIC_SITE_URL: http://localhost:4303
+      PUBLIC_API_URL: http://localhost:4302
+      PUBLIC_DASHBOARD_URL: http://localhost:4301
+      DEMO_SITE_KEY: *demo-site-key
+      PUBLIC_SITE_URL: http://localhost:4303
       TRUSTCAPTCHA_API_URL: http://api:3000
       TRUSTCAPTCHA_DEMO_SECRET: *demo-secret
     ports:

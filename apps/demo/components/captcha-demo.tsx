@@ -104,8 +104,8 @@ export function CaptchaDemo({
 
         {!siteKey ? (
           <div className="setup-notice">
-            Set <code>NEXT_PUBLIC_DEMO_SITE_KEY</code> to a Site Key whose
-            allowed origin includes this demo URL.
+            Set <code>DEMO_SITE_KEY</code> to a Site Key whose allowed origin
+            includes this demo URL.
           </div>
         ) : (
           <div id="trustcaptcha-widget" className="widget-slot" />

@@ -13,17 +13,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/docs" },
 };
 
-const htmlSnippet = `<script src="https://api.trustcaptcha.xuandev.com/v1/api.js" async defer></script>
-
-<form method="post" action="/signup">
-  <input name="email" type="email" required>
-  <div
-    class="trust-captcha"
-    data-sitekey="YOUR_SITE_KEY"
-    data-action="signup">
-  </div>
-  <button type="submit">Create account</button>
-</form>`;
+export const dynamic = "force-dynamic";
 
 const javascriptSnippet = `const widget = TrustCaptcha.render({
   element: "#captcha",
@@ -56,6 +46,24 @@ if (!result.success) {
 // Execute the protected business action only after success.`;
 
 export default function DeveloperDocsPage() {
+  const apiBaseUrl = (
+    process.env.PUBLIC_API_URL ?? "http://localhost:4302"
+  ).replace(/\/$/, "");
+  const dashboardUrl = (
+    process.env.PUBLIC_DASHBOARD_URL ?? "http://localhost:4301"
+  ).replace(/\/$/, "");
+  const htmlSnippet = `<script src="${apiBaseUrl}/v1/api.js" async defer></script>
+
+<form method="post" action="/signup">
+  <input name="email" type="email" required>
+  <div
+    class="trust-captcha"
+    data-sitekey="YOUR_SITE_KEY"
+    data-action="signup">
+  </div>
+  <button type="submit">Create account</button>
+</form>`;
+
   return (
     <main className="docs-page">
       <header className="docs-header">
@@ -68,10 +76,7 @@ export default function DeveloperDocsPage() {
           <a href="#testing">Testing</a>
           <a href="#reference">Reference</a>
         </nav>
-        <a
-          className="header-cta"
-          href="https://app.trustcaptcha.xuandev.com/register"
-        >
+        <a className="header-cta" href={`${dashboardUrl}/register`}>
           Get a Site Key
         </a>
       </header>
@@ -131,10 +136,7 @@ export default function DeveloperDocsPage() {
             </p>
             <CodeBlock label="Node.js" code={nodeSnippet} />
             <div className="docs-callout">
-              Direct HTTP:{" "}
-              <code>
-                POST https://api.trustcaptcha.xuandev.com/api/v1/verify
-              </code>
+              Direct HTTP: <code>POST {apiBaseUrl}/api/v1/verify</code>
               with JSON <code>{`{"action":"signup","token":"tc1..."}`}</code>
               and <code>Authorization: Bearer YOUR_SECRET_KEY</code>.
             </div>

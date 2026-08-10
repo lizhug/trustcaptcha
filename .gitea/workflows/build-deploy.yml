@@ -90,32 +90,6 @@ jobs:
           echo "release_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
           echo "channel_tag=$channel" >> "$GITHUB_OUTPUT"
 
-      - name: Validate public build configuration
-        if: ${{ matrix.target == 'runner' }}
-        shell: bash
-        env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
-          NEXT_PUBLIC_DASHBOARD_URL: ${{ vars.NEXT_PUBLIC_DASHBOARD_URL }}
-          NEXT_PUBLIC_DEMO_SITE_KEY: ${{ vars.NEXT_PUBLIC_DEMO_SITE_KEY }}
-          NEXT_PUBLIC_SIGNUP_SITE_KEY: ${{ vars.NEXT_PUBLIC_SIGNUP_SITE_KEY }}
-          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-        run: |
-          set -euo pipefail
-          missing=0
-          for name in \
-            NEXT_PUBLIC_API_URL \
-            NEXT_PUBLIC_DASHBOARD_URL \
-            NEXT_PUBLIC_DEMO_SITE_KEY \
-            NEXT_PUBLIC_SIGNUP_SITE_KEY \
-            NEXT_PUBLIC_SITE_URL
-          do
-            if [ -z "${!name:-}" ]; then
-              echo "Missing Gitea repository variable: $name" >&2
-              missing=1
-            fi
-          done
-          test "$missing" -eq 0
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
@@ -138,11 +112,6 @@ jobs:
           push: true
           build-args: |
             APP_NAME=${{ matrix.app_name }}
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_DASHBOARD_URL=${{ vars.NEXT_PUBLIC_DASHBOARD_URL }}
-            NEXT_PUBLIC_DEMO_SITE_KEY=${{ vars.NEXT_PUBLIC_DEMO_SITE_KEY }}
-            NEXT_PUBLIC_SIGNUP_SITE_KEY=${{ vars.NEXT_PUBLIC_SIGNUP_SITE_KEY }}
-            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
           tags: |
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.release.outputs.release_tag }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.release.outputs.channel_tag }}

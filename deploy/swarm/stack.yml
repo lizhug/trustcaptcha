@@ -35,8 +35,8 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required}
       SEED_CUSTOMER_NAME: ${SEED_CUSTOMER_NAME:-TrustCaptcha}
       SEED_CUSTOMER_SLUG: ${SEED_CUSTOMER_SLUG:-trustcaptcha}
-      SEED_DEMO_ORIGIN: https://trustcaptcha.xuandev.com
-      SEED_SIGNUP_ORIGIN: https://app.trustcaptcha.xuandev.com
+      SEED_DEMO_ORIGIN: ${PUBLIC_SITE_URL:?PUBLIC_SITE_URL is required}
+      SEED_SIGNUP_ORIGIN: ${PUBLIC_DASHBOARD_URL:?PUBLIC_DASHBOARD_URL is required}
       SEED_DEMO_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
       SEED_DEMO_SITE_SECRET: ${DEMO_SITE_SECRET:?DEMO_SITE_SECRET is required}
     networks:
@@ -52,11 +52,12 @@ services:
       <<: *app-environment
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
       AUTH_TRUST_HOST: "true"
-      AUTH_URL: https://app.trustcaptcha.xuandev.com
-      DASHBOARD_ORIGIN: https://app.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_DASHBOARD_URL: https://app.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_API_URL: https://api.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_SIGNUP_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
+      AUTH_URL: ${PUBLIC_DASHBOARD_URL:?PUBLIC_DASHBOARD_URL is required}
+      DASHBOARD_ORIGIN: ${PUBLIC_DASHBOARD_URL:?PUBLIC_DASHBOARD_URL is required}
+      PUBLIC_DASHBOARD_URL: ${PUBLIC_DASHBOARD_URL:?PUBLIC_DASHBOARD_URL is required}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL is required}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:?PUBLIC_SITE_URL is required}
+      SIGNUP_SITE_KEY: ${SIGNUP_SITE_KEY:?SIGNUP_SITE_KEY is required}
       CREEM_API_KEY: ${CREEM_API_KEY:-}
       CREEM_WEBHOOK_SECRET: ${CREEM_WEBHOOK_SECRET:-}
       CREEM_TEST_MODE: ${CREEM_TEST_MODE:-true}
@@ -124,10 +125,10 @@ services:
   demo:
     image: ${IMAGE_PREFIX}/demo:${IMAGE_TAG:-latest}
     environment:
-      NEXT_PUBLIC_API_URL: https://api.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_DASHBOARD_URL: https://app.trustcaptcha.xuandev.com
-      NEXT_PUBLIC_DEMO_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
-      NEXT_PUBLIC_SITE_URL: https://trustcaptcha.xuandev.com
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL is required}
+      PUBLIC_DASHBOARD_URL: ${PUBLIC_DASHBOARD_URL:?PUBLIC_DASHBOARD_URL is required}
+      DEMO_SITE_KEY: ${DEMO_SITE_KEY:?DEMO_SITE_KEY is required}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:?PUBLIC_SITE_URL is required}
       TRUSTCAPTCHA_API_URL: http://api:3000
       TRUSTCAPTCHA_DEMO_SECRET: ${DEMO_SITE_SECRET:?DEMO_SITE_SECRET is required}
     networks:

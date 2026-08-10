@@ -14,9 +14,7 @@ import {
 
 type PageContext = { params: Promise<{ locale: string }> };
 
-export function generateStaticParams() {
-  return marketingLocales.map((locale) => ({ locale }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -67,12 +65,12 @@ export default async function LocalizedMarketingPage({ params }: PageContext) {
   if (!isMarketingLocale(localeValue)) notFound();
   const locale: MarketingLocale = localeValue;
   const copy = dictionaries[locale];
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4302";
+  const apiBaseUrl = process.env.PUBLIC_API_URL ?? "http://localhost:4302";
   const dashboardUrl =
-    process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "http://localhost:4301";
-  const siteKey = process.env.NEXT_PUBLIC_DEMO_SITE_KEY ?? "";
+    process.env.PUBLIC_DASHBOARD_URL ?? "http://localhost:4301";
+  const siteKey = process.env.DEMO_SITE_KEY ?? "";
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:4303"
+    process.env.PUBLIC_SITE_URL ?? "http://localhost:4303"
   ).replace(/\/$/, "");
   const planTiers = ["FREE", "PRO", "SCALE", "PRIVATE"] as const;
   const structuredData = {

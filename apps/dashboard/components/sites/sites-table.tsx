@@ -69,10 +69,14 @@ type SecretState = {
 };
 
 export function SitesTable({
+  apiBaseUrl,
   canDelete,
+  docsUrl,
   onboarding = false,
 }: {
+  apiBaseUrl: string;
   canDelete: boolean;
+  docsUrl: string;
   onboarding?: boolean;
 }) {
   const actionRef = useRef<ActionType | undefined>(undefined);
@@ -376,12 +380,9 @@ export function SitesTable({
             <>
               <Typography.Text strong>Browser quickstart</Typography.Text>
               <Typography.Paragraph copyable code>
-                {`<script src="https://api.trustcaptcha.xuandev.com/v1/api.js" async defer></script>\n<div class="trust-captcha" data-sitekey="${secret.siteKey}" data-action="signup"></div>`}
+                {`<script src="${apiBaseUrl.replace(/\/$/, "")}/v1/api.js" async defer></script>\n<div class="trust-captcha" data-sitekey="${secret.siteKey}" data-action="signup"></div>`}
               </Typography.Paragraph>
-              <Typography.Link
-                href="https://trustcaptcha.xuandev.com/docs"
-                target="_blank"
-              >
+              <Typography.Link href={docsUrl} target="_blank">
                 Open complete integration guide
               </Typography.Link>
             </>
