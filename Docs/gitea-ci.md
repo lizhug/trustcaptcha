@@ -2,6 +2,10 @@
 
 The workflow at `.gitea/workflows/build-deploy.yml` validates the workspace and publishes the four Docker images consumed by the Swarm stack. Docker images are built only by CI.
 
+BuildKit uses a small per-image Actions cache. Cache export is best-effort, so a
+temporary runner artifact-cache outage cannot fail an image that was already
+published successfully.
+
 ## Trigger tags
 
 | Git tag     | Published image tags        | Deployment                             |

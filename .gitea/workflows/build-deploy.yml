@@ -115,8 +115,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.release.outputs.release_tag }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.release.outputs.channel_tag }}
-          cache-from: type=gha,scope=trustcaptcha-${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=trustcaptcha-${{ matrix.image }}
+          cache-from: type=gha,scope=trustcaptcha-${{ matrix.image }},timeout=2m
+          cache-to: type=gha,mode=min,scope=trustcaptcha-${{ matrix.image }},timeout=2m,ignore-error=true
 
       - name: Remove Buildx builder
         if: always()
