@@ -26,11 +26,9 @@ RUN --mount=type=cache,id=trustcaptcha-pnpm,target=/pnpm/store \
   pnpm install --frozen-lockfile
 
 COPY . .
-COPY --chmod=755 docker/swarm-entrypoint.sh /usr/local/bin/trustcaptcha-entrypoint
 
 FROM dependencies AS migrator
 RUN pnpm --dir packages/database db:generate
-ENTRYPOINT ["/usr/local/bin/trustcaptcha-entrypoint"]
 CMD ["sh", "-c", "pnpm --dir packages/database exec prisma migrate deploy && pnpm --dir packages/database db:seed"]
 
 FROM dependencies AS builder
@@ -61,12 +59,10 @@ ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
-COPY --from=builder --chown=root:root /usr/local/bin/trustcaptcha-entrypoint /usr/local/bin/trustcaptcha-entrypoint
 COPY --from=builder --chown=node:node /workspace/apps/${APP_NAME}/.next/standalone ./
 COPY --from=builder --chown=node:node /workspace/apps/${APP_NAME}/.next/static ./apps/${APP_NAME}/.next/static
 COPY --from=builder --chown=node:node /workspace/apps/${APP_NAME}/public ./apps/${APP_NAME}/public
 
 USER node
 EXPOSE 3000
-ENTRYPOINT ["/usr/local/bin/trustcaptcha-entrypoint"]
 CMD ["sh", "-c", "exec node apps/${APP_NAME}/server.js"]
