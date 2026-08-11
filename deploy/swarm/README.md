@@ -6,9 +6,9 @@ This deployment uses stack name `trustcaptcha` and three HTTPS origins:
 - `https://app.trustcaptcha.xuandev.com` — customer dashboard
 - `https://api.trustcaptcha.xuandev.com` — public verification API
 
-The application services publish no host ports. Caddy reaches them through a
-shared encrypted overlay network. PostgreSQL and Redis are external managed
-services and are not created by this stack.
+The application services publish no host ports. Caddy reaches them through the
+existing Swarm-scoped `edge-public` overlay network. PostgreSQL and Redis are
+external managed services and are not created by this stack.
 
 ## 1. DNS and prerequisites
 
@@ -18,21 +18,17 @@ initialized, and the deployment machine needs Docker, OpenSSL, registry
 credentials, and network access to the external PostgreSQL and Redis endpoints.
 All runtime secrets are supplied through the private Stack environment.
 
-Create or reuse an attachable overlay network for Caddy:
+The platform stack must already provide the external Swarm overlay network
+`edge-public`, as declared by the shared Caddy deployment. Confirm the running
+Caddy service is connected to it. For example:
 
 ```sh
-docker network create --driver overlay --attachable caddy
+docker network inspect edge-public
+docker service inspect YOUR_CADDY_SERVICE
 ```
 
-If it already exists, Docker will report that and no change is needed. Ensure
-the running Caddy service is connected to this network. For example:
-
-```sh
-docker service update --network-add caddy YOUR_CADDY_SERVICE
-```
-
-Only run the update when `docker service inspect YOUR_CADDY_SERVICE` confirms
-that the network is not already attached.
+TrustCaptcha deliberately does not create or own this shared network. This
+prevents a second application stack from replacing the platform edge network.
 
 ## 2. Production variables
 
